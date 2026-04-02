@@ -45,14 +45,14 @@ namespace DarkCloud2_EnemyRandomizer
             {
                 label2.Text = "This mod randomizes enemies in Dark Cloud 2. You must be using PCSX2 and have Dark Cloud 2 (USA).";
 
-                if (Memory.ReadInt(0x203694D0) == 1701667175)
+                if (Memory.ReadInt(Program.BaseAddress + 0x003694D0) == 1701667175)
                 {
                     gameCheck = false;
                     Randomizer.gameVersion = 1;
                     button1.Enabled = false;
                     label3.Text = "Detected Dark Chronicle (PAL version)! However, this mod only works with the USA version. Sorry.";
                 }
-                else if (Memory.ReadInt(0x20364BD0) == 1701667175)
+                else if (Memory.ReadInt(Program.BaseAddress + 0x00364BD0) == 1701667175)
                 {
                     gameCheck = true;
                     Randomizer.gameVersion = 2;

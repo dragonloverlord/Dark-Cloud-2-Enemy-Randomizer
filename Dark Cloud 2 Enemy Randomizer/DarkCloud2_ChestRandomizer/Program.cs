@@ -3,11 +3,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using System.IO;
 
 namespace DarkCloud2_EnemyRandomizer
 {
     static class Program
     {
+        public static long BaseAddress { get; private set; }
 
         public static void PressEntertoContinue() //Added a simple function for pausing and waiting for input from the user.
         {
@@ -21,7 +23,11 @@ namespace DarkCloud2_EnemyRandomizer
         [STAThread]
         static void Main()
         {
+            Memory.Initialize();
+            BaseAddress = Memory.EEMem_Address;
             Console.WriteLine("\nDark Cloud 2 Enemy Randomizer");
+            Console.WriteLine("\nEEMem_Address: {0:X8}", $"0x{Memory.EEMem_Address:X}");
+            Console.WriteLine(BaseAddress);
 
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);

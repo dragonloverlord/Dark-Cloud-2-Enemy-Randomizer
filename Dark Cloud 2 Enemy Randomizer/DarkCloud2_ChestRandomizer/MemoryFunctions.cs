@@ -4,11 +4,25 @@ using System.Diagnostics;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.CodeDom;
+using System.ComponentModel;
+using System.Data;
+using System.Resources;
+using System.IO;
+using System.Threading;
+using System.Windows;
+using System.Windows.Forms;
 
 namespace DarkCloud2_EnemyRandomizer
 {
     class Memory
     {
+        //Variables For PCSX2 64bit / Modern Support
+        internal static Process process;
+        internal static string procName = "pcsx2";
+        internal static long EEMem_Address, EEMem_Offset;
+        internal static long Check_EEMem_Address, Check_EEMem_Offset;
+
         //Define some needed flags
         public const uint FORMAT_MESSAGE_ALLOCATE_BUFFER = 0x00000100;
         public const uint FORMAT_MESSAGE_IGNORE_INSERTS = 0x00000200;
@@ -20,6 +34,10 @@ namespace DarkCloud2_EnemyRandomizer
         public const uint PROCESS_SUSPEND_RESUME = 0x0800;
 
         public const uint PAGE_EXECUTE_READWRITE = 0x40;
+
+        //DLL Used To Find The Base Address For PCSX2 64bit / Modern Support
+        [DllImport("\\Resources\\pcsx2_offsetreader.dll", EntryPoint = "?GetEEMem@@YAJH@Z", CallingConvention = CallingConvention.Cdecl)]
+        private static extern long GetEEMem(int procID);
 
         [DllImport("kernel32.dll", SetLastError = true)]
         public static extern uint GetLastError();
@@ -34,16 +52,16 @@ namespace DarkCloud2_EnemyRandomizer
         private static extern IntPtr OpenProcess(uint dwDesiredAccess, bool bInheritHandle, int dwProcessId);
 
         [DllImport("kernel32.dll", SetLastError = true, CallingConvention = CallingConvention.ThisCall)]
-        public static extern bool VirtualProtect(IntPtr processH, int lpAddress, int lpBuffer, uint flNewProtect, out uint lpflOldProtect);
+        public static extern bool VirtualProtect(IntPtr processH, long lpAddress, int lpBuffer, uint flNewProtect, out uint lpflOldProtect);
 
         [DllImport("kernel32.dll", SetLastError = true)]
-        public static extern bool VirtualProtectEx(IntPtr processH, int lpAddress, int lpBuffer, uint flNewProtect, out uint lpflOldProtect);
+        public static extern bool VirtualProtectEx(IntPtr processH, long lpAddress, int lpBuffer, uint flNewProtect, out uint lpflOldProtect);
 
         [DllImport("kernel32.dll", SetLastError = true)] //Import for reading process memory.
-        private static extern bool ReadProcessMemory(IntPtr processH, int lpBaseAddress, byte[] lpBuffer, int dwSize, out IntPtr lpNumberOfBytesRead);
+        private static extern bool ReadProcessMemory(IntPtr processH, long lpBaseAddress, byte[] lpBuffer, int dwSize, out IntPtr lpNumberOfBytesRead);
 
         [DllImport("kernel32.dll", SetLastError = true)] //Import for writing process memory.
-        private static extern bool WriteProcessMemory(IntPtr processH, int lpBaseAddress, byte[] lpBuffer, int dwSize, out IntPtr lpNumberOfBytesWritten);
+        private static extern bool WriteProcessMemory(IntPtr processH, long lpBaseAddress, byte[] lpBuffer, int dwSize, out IntPtr lpNumberOfBytesWritten);
 
         [DllImport("kernel32.dll", SetLastError = true)]  //Import DLL again for Closing Handles to processes and add the function to our program.
         internal static extern bool CloseHandle(IntPtr processH);
@@ -80,6 +98,57 @@ namespace DarkCloud2_EnemyRandomizer
             return sRet;
         }
 
+        public static int Initialize()
+        {
+            process = GetProcess(procName);
+
+            if (process != null)
+            {
+                Check_EEMem_Address = ReadLong(GetEEMem(process.Id));
+                Check_EEMem_Offset = Check_EEMem_Address - 0x20000000;
+
+                switch (process.ProcessName)
+                {
+                    case "pcsx2":
+                        EEMem_Offset = 0x00000000;
+                        break;
+                }
+
+                if (Check_EEMem_Address > 0x0)
+                {
+                    EEMem_Address = Check_EEMem_Address;
+                    EEMem_Offset = Check_EEMem_Offset;
+                }
+            }
+
+            return 0;
+        }
+
+        public static Process GetProcess(string procName) //Function for retrieving process from running processes.
+        {
+            Process[] processes = Process.GetProcesses(); //Fetch the array of running processes
+            Process foundProcess = null;
+            int processInstances = 0;
+
+            procName = procName.ToLowerInvariant().Trim();
+
+            foreach (Process process in processes)
+            {
+                if (process.ProcessName.ToLowerInvariant().Trim().Contains(procName)) //If we found the process, continue.
+                {
+                    foundProcess = process;
+                    processInstances++;
+                }
+            }
+
+            if (processInstances > 1)
+            {
+                Console.WriteLine("Found {0} running instances of {1}. Using the last instance found...", processInstances, foundProcess.ProcessName);
+            }
+
+            return foundProcess; //Return our process or default null if not found
+        }
+
         private static int GetProcessID(string procName) //Function for retrieving processID from running processes.
         {
             Process[] Processes = Process.GetProcessesByName(procName); //Search the list of running processes for procName - ex. (pcsx2)
@@ -103,13 +172,22 @@ namespace DarkCloud2_EnemyRandomizer
             }
         }
 
+        internal static long ReadLong(long address)
+        {
+            byte[] dataBuffer = new byte[8];
+
+            ReadProcessMemory(process.Handle, address + EEMem_Offset, dataBuffer, dataBuffer.Length, out _); //_ seems to act as NULL, we don't need numOfBytesRead
+
+            return BitConverter.ToInt64(dataBuffer, 0);
+        }
+
         //Make PID available anywhere within the program.
         internal static readonly int PID = GetProcessID("pcsx2");   //Case sensitive
 
         //Open process with Read and Write permissions
         internal static readonly IntPtr processH = OpenProcess(PROCESS_VM_OPERATION | PROCESS_SUSPEND_RESUME | PROCESS_VM_READ | PROCESS_VM_WRITE, false, PID);
 
-        internal static byte ReadByte(int address)  //Read byte from address
+        internal static byte ReadByte(long address)  //Read byte from address
         {
             byte[] dataBuffer = new byte[1];
 
@@ -118,7 +196,7 @@ namespace DarkCloud2_EnemyRandomizer
             return dataBuffer[0];
         }
 
-        internal static byte[] ReadByteArray(int address, int numBytes)  //Read byte from address
+        internal static byte[] ReadByteArray(long address, int numBytes)  //Read byte from address
         {
             byte[] dataBuffer = new byte[numBytes];
 
@@ -127,7 +205,7 @@ namespace DarkCloud2_EnemyRandomizer
             return dataBuffer;
         }
 
-        internal static ushort ReadUShort(int address)  //Read unsigned short from address
+        internal static ushort ReadUShort(long address)  //Read unsigned short from address
         {
             byte[] dataBuffer = new byte[2];
 
@@ -136,7 +214,7 @@ namespace DarkCloud2_EnemyRandomizer
             return BitConverter.ToUInt16(dataBuffer, 0);
         }
 
-        internal static short ReadShort(int address)
+        internal static short ReadShort(long address)
         {
             byte[] dataBuffer = new byte[2]; //Read this many bytes of the address
 
@@ -145,7 +223,7 @@ namespace DarkCloud2_EnemyRandomizer
             return BitConverter.ToInt16(dataBuffer, 0); //Convert Bit Array to 16-bit Int (short) and return it
         }
 
-        internal static uint ReadUInt(int address)
+        internal static uint ReadUInt(long address)
         {
             byte[] dataBuffer = new byte[4];
 
@@ -154,7 +232,7 @@ namespace DarkCloud2_EnemyRandomizer
             return BitConverter.ToUInt32(dataBuffer, 0);
         }
 
-        internal static int ReadInt(int address)
+        internal static int ReadInt(long address)
         {
             byte[] dataBuffer = new byte[4];
 
@@ -163,7 +241,7 @@ namespace DarkCloud2_EnemyRandomizer
             return BitConverter.ToInt32(dataBuffer, 0);
         }
 
-        internal static float ReadFloat(int address)
+        internal static float ReadFloat(long address)
         {
             byte[] dataBuffer = new byte[8];
 
@@ -172,7 +250,7 @@ namespace DarkCloud2_EnemyRandomizer
             return BitConverter.ToSingle(dataBuffer, 0);
         }
 
-        internal static double ReadDouble(int address)
+        internal static double ReadDouble(long address)
         {
             byte[] dataBuffer = new byte[8];
 
@@ -181,7 +259,7 @@ namespace DarkCloud2_EnemyRandomizer
             return BitConverter.ToDouble(dataBuffer, 0); ;
         }
 
-        internal static string ReadString(int address, int length)
+        internal static string ReadString(long address, int length)
         {
             //http://stackoverflow.com/questions/1003275/how-to-convert-byte-to-string
             byte[] dataBuffer = new byte[length];
@@ -191,12 +269,12 @@ namespace DarkCloud2_EnemyRandomizer
             return Encoding.GetEncoding(10000).GetString(dataBuffer);
         }
 
-        internal static bool Write(int address, byte[] value)
+        internal static bool Write(long address, byte[] value)
         {
             return WriteProcessMemory(processH, address, value, value.Length, out _);
         }
 
-        internal static bool WriteString(int address, string stringToWrite) //Untested
+        internal static bool WriteString(long address, string stringToWrite) //Untested
         {
             // http://stackoverflow.com/questions/16072709/converting-string-to-byte-array-in-c-sharp
             byte[] dataBuffer = Encoding.GetEncoding(10000).GetBytes(stringToWrite); //Western European (Mac) Encoding Table
@@ -204,12 +282,12 @@ namespace DarkCloud2_EnemyRandomizer
             return WriteProcessMemory(processH, address, dataBuffer, dataBuffer.Length, out _);
         }
 
-        internal static bool WriteByte(int address, byte value)
+        internal static bool WriteByte(long address, byte value)
         {
             return Write(address, BitConverter.GetBytes(value));
         }
 
-        internal static void WriteByteArray(int address, byte[] byteArray)  //Write byte array at address
+        internal static void WriteByteArray(long address, byte[] byteArray)  //Write byte array at address
         {
             bool successful;
 
@@ -224,27 +302,27 @@ namespace DarkCloud2_EnemyRandomizer
                 Console.WriteLine(GetLastError() + " - " + GetSystemMessage(GetLastError()));
         }
 
-        internal static bool WriteUShort(int address, ushort value)
+        internal static bool WriteUShort(long address, ushort value)
         {
             return Write(address, BitConverter.GetBytes(value));
         }
 
-        internal static bool WriteInt(int address, int value)
+        internal static bool WriteInt(long address, int value)
         {
             return Write(address, BitConverter.GetBytes(value));
         }
 
-        internal static bool WriteUInt(int address, uint value)
+        internal static bool WriteUInt(long address, uint value)
         {
             return Write(address, BitConverter.GetBytes(value));
         }
 
-        internal static bool WriteFloat(int address, float value)
+        internal static bool WriteFloat(long address, float value)
         {
             return Write(address, BitConverter.GetBytes(value));
         }
 
-        internal static bool WriteDouble(int address, double value)
+        internal static bool WriteDouble(long address, double value)
         {
             return Write(address, BitConverter.GetBytes(value));
         }

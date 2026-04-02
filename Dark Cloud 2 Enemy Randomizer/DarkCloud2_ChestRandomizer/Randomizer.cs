@@ -10,9 +10,9 @@ namespace DarkCloud2_EnemyRandomizer
 {
     public class Randomizer
     {      
-        static int prevFloor;
+        static long prevFloor;
         static bool exitError;
-        public static int itemAmount;
+        public static long itemAmount;
 
         static bool randomEnemies;
         static bool differentSound;
@@ -40,11 +40,11 @@ namespace DarkCloud2_EnemyRandomizer
         static bool originalEnemies = true;
         static bool originalNames = true;
 
-        static int currentFloorAddress = 0x21ECD638;
-        static int currentDungeonAddress = 0x20376638;
-        static int currentFloor;
+        static long currentFloorAddress = Program.BaseAddress + 0x01ECD638;
+        static long currentDungeonAddress = Program.BaseAddress + 0x00376638;
+        static long currentFloor;
 
-        static int unableToMoveAddress = 0x2037869C;
+        static long unableToMoveAddress = Program.BaseAddress + 0x0037869C;
 
         public static int gameVersion = 0;
 
@@ -157,10 +157,10 @@ namespace DarkCloud2_EnemyRandomizer
 
                 if (gameVersion == 1)
                 {
-                    if (Memory.ReadInt(0x203694D0) != 1701667175)
+                    if (Memory.ReadInt(Program.BaseAddress + 0x003694D0) != 1701667175)
                     {
                         Thread.Sleep(1000);
-                        if (Memory.ReadInt(0x203694D0) != 1701667175)
+                        if (Memory.ReadInt(Program.BaseAddress + 0x003694D0) != 1701667175)
                         {
                             Program.ExitProgram();
                         }
@@ -169,10 +169,10 @@ namespace DarkCloud2_EnemyRandomizer
                 else if (gameVersion == 2)
                 {
 
-                    if (Memory.ReadInt(0x20364BD0) != 1701667175)
+                    if (Memory.ReadInt(Program.BaseAddress + 0x00364BD0) != 1701667175)
                     {
                         Thread.Sleep(1000);
-                        if (Memory.ReadInt(0x20364BD0) != 1701667175)
+                        if (Memory.ReadInt(Program.BaseAddress + 0x00364BD0) != 1701667175)
                         {
                             Program.ExitProgram();
                         }
@@ -188,7 +188,7 @@ namespace DarkCloud2_EnemyRandomizer
         {
             Console.WriteLine("Storing enemy data");
             enemies.Clear();
-            int currentAddress = 0x2033D9E0;
+            long currentAddress = Program.BaseAddress + 0x0033D9E0;
             currentAddress += 0x00000004;
             for (int i = 0; i < 280; i++)
             {
@@ -263,7 +263,7 @@ namespace DarkCloud2_EnemyRandomizer
         private static void RandomizeEnemies()
         {
             Console.WriteLine("Randomizing enemies");
-            int currentAddress = 0x2033D9E0;
+            long currentAddress = Program.BaseAddress + 0x0033D9E0;
             currentAddress += 0x00000004;
             ArrayList enemiesRandomized = new ArrayList();
             enemiesRandomized = Shuffle(enemies);
@@ -271,17 +271,17 @@ namespace DarkCloud2_EnemyRandomizer
             {
                 string[] completeEnemy = (string[])enemiesRandomized[i];
                 //Console.WriteLine(String.Join(" ", completeEnemy));
-                if(currentAddress == 0x20342A64) // Gemrons start
+                if(currentAddress == Program.BaseAddress + 0x00342A64) // Gemrons start
                 {
                     currentAddress += 0x00000E60; // Bypassing gemrons
                     currentAddress = WriteRandomEnemyData(completeEnemy, currentAddress);
                 }
-                else if(currentAddress == 0x20341084) // Elements start
+                else if(currentAddress == Program.BaseAddress + 0x00341084) // Elements start
                 {
                     currentAddress += 0x00000E60; // Bypassing elementals
                     currentAddress = WriteRandomEnemyData(completeEnemy, currentAddress);
                 } 
-                else if(currentAddress == 0x20340AC4 || currentAddress == 0x2033FC64) // Linda or Memo Eater
+                else if(currentAddress == Program.BaseAddress + 0x00340AC4 || currentAddress == Program.BaseAddress + 0x0033FC64) // Linda or Memo Eater
                 {
                     currentAddress += 0x000000B8; // Bypassing Linda and Memo Eater
                     currentAddress = WriteRandomEnemyData(completeEnemy, currentAddress);
@@ -297,7 +297,7 @@ namespace DarkCloud2_EnemyRandomizer
 
         private static void RandomizeGemrons()
         {
-            int currentAddress = 0x20342A60;
+            long currentAddress = Program.BaseAddress + 0x00342A60;
             currentAddress += 0x00000004;
             ArrayList gemronsRandomized = new ArrayList();
             gemronsRandomized = Shuffle(gemrons);
@@ -310,7 +310,7 @@ namespace DarkCloud2_EnemyRandomizer
         
         private static void RandomizeElementals()
         {
-            int currentAddress = 0x20341080;
+            long currentAddress = Program.BaseAddress + 0x00341080;
             currentAddress += 0x00000004;
             ArrayList elementalsRandomized = new ArrayList();
             elementalsRandomized = Shuffle(elementals);
@@ -321,7 +321,7 @@ namespace DarkCloud2_EnemyRandomizer
             }
         }
 
-        private static int WriteRandomEnemyData(string[] completeEnemy, int currentAddress)
+        private static long WriteRandomEnemyData(string[] completeEnemy, long currentAddress)
         {
             if (randomEnemies)
             {
@@ -540,21 +540,21 @@ namespace DarkCloud2_EnemyRandomizer
         // Writes every single byte of data
         private static void WriteAllData(string data)
         {
-            int currentAddress = 0x2033D9E0;
+            long currentAddress = 0x0033D9E0;
             Memory.WriteString(currentAddress, data);
         }
 
         // Stores every single byte of enemy data
         private static string ObtainAllData()
         {
-            int currentAddress = 0x2033D9E0;
+            long currentAddress = Program.BaseAddress + 0x0033D9E0;
             string allEnemyData = Memory.ReadString(currentAddress, 51520);
             return allEnemyData;
         }
 
         private static void ResetEnemies(string enemyData)
         {
-            while (Memory.ReadByte(0x2037869C) == 0) // 0 is open inventory/cutscene, 1 is moving
+            while (Memory.ReadByte(Program.BaseAddress + 0x0037869C) == 0) // 0 is open inventory/cutscene, 1 is moving
             {
                 Thread.Sleep(1);
             }
@@ -569,9 +569,9 @@ namespace DarkCloud2_EnemyRandomizer
                     Console.WriteLine("Current floor has a cutscene");
                     // Wait
                 }
-                while (Memory.ReadByte(0x20D06FE4) == 0 || Memory.ReadInt(0x20D06FE4) > veryHigh || Memory.ReadInt(0x20D06FE4) < 0) // Wait until an enemy spawns / allocates first HP address
+                while (Memory.ReadByte(Program.BaseAddress + 0x00D06FE4) == 0 || Memory.ReadInt(Program.BaseAddress + 0x00D06FE4) > veryHigh || Memory.ReadInt(Program.BaseAddress + 0x00D06FE4) < 0) // Wait until an enemy spawns / allocates first HP address
                 {
-                    //Console.WriteLine(Memory.ReadByte(0x20D06FE4));
+                    //Console.WriteLine(Memory.ReadByte(0x00D06FE4));
                     Thread.Sleep(1);
                     // On boss floors no enemy will spawn, breaking monster transforms
                     // If boss floor, force wait for 5 seconds and break waiting while loop
@@ -580,10 +580,10 @@ namespace DarkCloud2_EnemyRandomizer
                         break;
                     }
                 }
-                Console.WriteLine("Last enemy HP was " + Memory.ReadInt(0x20D06FE4));
+                Console.WriteLine("Last enemy HP was " + Memory.ReadInt(Program.BaseAddress + 0x00D06FE4));
                 Console.WriteLine("Enemy spawned, waiting 3 secs before reseting");
                 Thread.Sleep(3000);
-                int currentAddress = 0x2033DA04; // Beginning of all enemy data, starts with "load position"
+                long currentAddress = Program.BaseAddress + 0x0033DA04; // Beginning of all enemy data, starts with "load position"
                 if ( !(Memory.ReadByte(currentDungeonAddress) == 0 && Memory.ReadByte(currentFloorAddress) == 7) ) // Channel Reservoir Random Monster transform easter egg
                 {
                     Console.WriteLine("Resetting models and AI for monster transforms");
@@ -601,7 +601,7 @@ namespace DarkCloud2_EnemyRandomizer
 
         private static void ResetNames(string enemyData)
         {
-            int currentAddress = 0x2033D9E4;
+            long currentAddress = Program.BaseAddress + 0x0033D9E4;
             Console.WriteLine("Resetting data for monster transform names and bestiary fix");
             for (int i = 0; i < 280; i++)
             {
@@ -700,11 +700,11 @@ namespace DarkCloud2_EnemyRandomizer
 
         private static void MainMenuCheck()
         {
-            if(Memory.ReadByte(0x20376FCC) == 3)
+            if(Memory.ReadByte(Program.BaseAddress + 0x00376FCC) == 3)
             {
                 Console.WriteLine("Main menu entered, waiting...");
                 prevFloor = -1;
-                while (Memory.ReadByte(0x20376FCC) == 3) // Main Menu
+                while (Memory.ReadByte(Program.BaseAddress + 0x00376FCC) == 3) // Main Menu
                 {
                     Thread.Sleep(1);
                 }
@@ -713,16 +713,16 @@ namespace DarkCloud2_EnemyRandomizer
         }
         private static void Tutorial()
         {
-            string clownNameModel = Memory.ReadString(0x2033F3C4, 48);
-            string griffonSoldierNameModel = Memory.ReadString(0x2033F47C, 48);
-            string evilPerformerNameModel = Memory.ReadString(0x2033F534, 48);
-            string darkAlchemistNameModel = Memory.ReadString(0x2033F5EC, 48);
+            string clownNameModel = Memory.ReadString(Program.BaseAddress + 0x0033F3C4, 48);
+            string griffonSoldierNameModel = Memory.ReadString(Program.BaseAddress + 0x0033F47C, 48);
+            string evilPerformerNameModel = Memory.ReadString(Program.BaseAddress + 0x0033F534, 48);
+            string darkAlchemistNameModel = Memory.ReadString(Program.BaseAddress + 0x0033F5EC, 48);
             string[] clownOptions = { griffonSoldierNameModel, evilPerformerNameModel, darkAlchemistNameModel};
             string[] griffonSoldierOptions = { clownNameModel, evilPerformerNameModel, darkAlchemistNameModel};
-            int clownChoice = random.Next(0, 2);
-            int griffonSoldierChoice = random.Next(0, 2);
-            Memory.WriteString(0x2034B2F4, griffonSoldierOptions[griffonSoldierChoice]); // Tutorial griffon soldiers memory address
-            Memory.WriteString(0x2034B3AC, clownOptions[clownChoice]); // Tutorial clowns memory address
+            long clownChoice = random.Next(0, 2);
+            long griffonSoldierChoice = random.Next(0, 2);
+            Memory.WriteString(Program.BaseAddress + 0x0034B2F4, griffonSoldierOptions[griffonSoldierChoice]); // Tutorial griffon soldiers memory address
+            Memory.WriteString(Program.BaseAddress + 0x0034B3AC, clownOptions[clownChoice]); // Tutorial clowns memory address
         }
     }
 }
